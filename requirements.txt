@@ -1,0 +1,5 @@
+pycrypto
+flask
+flask_login
+flask_restplus
+flask_sqlalchemy
