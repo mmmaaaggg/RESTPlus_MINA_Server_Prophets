@@ -18,6 +18,6 @@ if __name__ == '__main__':
 
     app.run(
         host='0.0.0.0', port=config.APP_PORT, debug=True,
-        ssl_context='adhoc',
-        # ssl_context=(config.HTTPS_SSL_PEM_FILE_PATH, config.HTTPS_SSL_KEY_FILE_PATH) if config.APP_ENABLE_SSL else None
+        # ssl_context='adhoc',
+        ssl_context=(config.HTTPS_SSL_PEM_FILE_PATH, config.HTTPS_SSL_KEY_FILE_PATH) if config.APP_ENABLE_SSL else None
     )
