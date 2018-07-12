@@ -3,3 +3,6 @@ flask
 flask_login
 flask_restplus
 flask_sqlalchemy
+pandas
+xlrd
+pyOpenSSL
