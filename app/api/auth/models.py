@@ -110,7 +110,7 @@ class User(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     """user_loader回调，用于从会话中存储的用户ID重新加载用户对象"""
-    logger.debug(user_id)
+    logger.debug('user_id=%d', int(user_id))
     return User.query.get(int(user_id))
 
 

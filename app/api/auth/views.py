@@ -24,6 +24,7 @@ from app.config import config
 from app import db
 from app.api.auth import api
 from app.api.auth.models import User
+
 logger = logging.getLogger()
 
 login_model = api.model('Login', {
@@ -35,15 +36,20 @@ login_model = api.model('Login', {
     'expired': fields.String(required=True, description='Seconds of Expired'),
 })
 
-login_req_parser = reqparse.RequestParser()
-login_req_parser.add_argument('code', type=str, required=True, help='wx.login() 返回 code')
-login_req_parser.add_argument('encryptedData', type=str, help='解密加密数据，校验appid')
-login_req_parser.add_argument('iv', type=str, help='解密加密数据，校验appid')
-login_req_parser.add_argument('rawData', type=str, help='校验签名，判别数据完整性')
-login_req_parser.add_argument('signature', type=str, help='校验签名，判别数据完整性')
+login_parser = reqparse.RequestParser(
+).add_argument(
+    'code', type=str, required=True, help='wx.login() 返回 code'
+).add_argument(
+    'encryptedData', type=str, help='解密加密数据，校验appid'
+).add_argument(
+    'iv', type=str, help='解密加密数据，校验appid'
+).add_argument(
+    'rawData', type=str, help='校验签名，判别数据完整性'
+).add_argument(
+    'signature', type=str, help='校验签名，判别数据完整性')
 
-login_token_req_parser = reqparse.RequestParser()
-login_token_req_parser.add_argument('token', type=str, location='headers', required=True, help='登录 token')
+login_token_parser = reqparse.RequestParser().add_argument(
+    'token', type=str, location='headers', required=True, help='登录 token')
 
 
 def sha1Sign(session_key, rawData):
@@ -72,15 +78,15 @@ class Login(Resource):
     """
 
     @api.doc('user login')
-    @api.expect(login_req_parser)
-    @api.marshal_list_with(login_model)
+    @api.expect(login_parser)
+    @api.marshal_with(login_model)
     def get(self):
         """
     微信小程序注册登陆接口
     :return:
     """
 
-        args = login_req_parser.parse_args()
+        args = login_parser.parse_args()
         code = args['code']
         encryptedData = args['encryptedData'] if 'encryptedData' in args else None
         rawData = args['rawData'] if 'rawData' in args else None
@@ -143,7 +149,7 @@ class Login(Resource):
             token = user.generate_auth_token(expiration=expired)
             current_app.login_user_dic[token] = user
             logger.debug('token: %s' % token)
-            return {'userid': user.id,
+            return {'user_id': user.id,
                     'is_first': is_first,
                     'got_auth': user.got_auth,
                     'token': token,
@@ -158,25 +164,26 @@ class LoginTest(Resource):
     """
     登录测试
     """
+
     @login_required
-    @api.expect(login_token_req_parser)
+    @api.expect(login_token_parser)
     def get(self):
-        args = login_token_req_parser.parse_args()
+        args = login_token_parser.parse_args()
         token = args['token']
         logger.debug("session data:")
         for num, (key, val) in enumerate(session.items()):
             logger.debug("%2d) %s = %s", num, key, val)
         logger.debug("%s", type(current_user))
-        return jsonify({'status': 'ok', 'message': 'Hello world!\nYou have login',
+        return {'status': 'ok', 'message': 'Hello world!\nYou have login',
                         'token': token,
-                        'current_user': str(current_user)})
+                        'current_user': str(current_user)}
 
 
 @api.route('/login_force/<int:user_id>')
 @api.param('user_id', '强制以制定id用户身份登录')
 class LoginForce(Resource):
     @api.doc('user login')
-    @api.marshal_list_with(login_model)
+    @api.marshal_with(login_model)
     def get(self, user_id=1):
         """
         仅供测试使用。默认第一个微信用户身份进行登陆。
@@ -185,7 +192,7 @@ class LoginForce(Resource):
         """
         user = User.query.filter(User.id == user_id).first()
         if user is None:
-            return jsonify({'errmsg': 'missing code, hints: [ req_id: Nlh0Ga0255th54 ]', 'errcode': 41008})
+            return {'errmsg': 'missing code, hints: [ req_id: Nlh0Ga0255th54 ]', 'errcode': 41008}
 
         is_first = False
         # 登录用户，并返回由openid和SECRET_KEY构成的token
