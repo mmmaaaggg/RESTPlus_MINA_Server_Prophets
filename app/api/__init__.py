@@ -11,8 +11,9 @@
 from flask_restplus import Api
 
 # from .cat import api as ns1
-from .auth.views import api as ns2
-
+from .auth import api as ns2
+from .forecast import api as ns3
+from .asset import api as ns4
 api = Api(
     title='MINA Prophets Server',
     version='1.0',
@@ -21,3 +22,5 @@ api = Api(
 
 # api.add_namespace(ns1)
 api.add_namespace(ns2)
+api.add_namespace(ns3)
+api.add_namespace(ns4)
