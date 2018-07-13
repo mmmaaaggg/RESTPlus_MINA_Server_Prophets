@@ -92,6 +92,15 @@ pl_create_model = api.model('portfolio_create_model', {
     'pl_data': fields.Nested(pl_data_model, description='投资组合信息'),
 })
 
+cmp_create_model = api.model('portfolio_create_model', {
+    'name': fields.String(description='名称', required=True),
+    'access_type': fields.String(description='public 公开 private 私有', required=True),
+    'date_from': fields.Date(description='起始日期'),
+    'date_to': fields.Date(description='起始日期'),
+    'desc': fields.String(description='描述信息', required=True),
+    'params': fields.Nested(pl_data_model, description='投资组合信息'),
+})
+
 create_rsp_model = api.model('create_rsp_model', {
     'status': fields.String(descrption='状态'),
     'message': fields.String(description='备注'),
@@ -119,7 +128,7 @@ stats_model = api.model('stats_model', {
 class CompareInfoResource(Resource):
 
     @api.doc('创建预测信息')
-    @api.expect(login_parser, pl_create_model)
+    @api.expect(login_parser, cmp_create_model)
     @api.marshal_with(create_rsp_model)
     @login_required
     @api.response(404, "参数错误", model=error_model)
@@ -365,6 +374,25 @@ class CompareFavorite(Resource):
                 return {"status": "error", 'id': _id, "message": exp.args[0]}, 404
 
             return {"status": "ok", 'id': data_obj.id}
+
+
+@api.route('/cmp/info/<int:_id>')
+@api.param('_id', '预测ID')
+class PortfolioInfoActionResource(Resource):
+
+    @api.doc('删除指定预测')
+    @api.expect(login_parser)
+    @api.marshal_with(create_rsp_model)
+    @login_required
+    @api.response(404, "参数错误", model=error_model)
+    def delete(self, _id):
+        """
+        删除指定预测
+        """
+        logger.debug('cmp_id=%d', _id)
+        PortfolioCompareInfo.query.filter(PortfolioCompareInfo.cmp_id == _id).update({'is_del': 1})
+        db.session.commit()
+        return {'status': 'ok'}
 
 
 @api.route('/pl/data/<int:_id>/<string:status>/<string:method>')
@@ -941,7 +969,7 @@ class CompareFavorite(Resource):
 @api.param('_id', '投资组合ID')
 class PortfolioInfoActionResource(Resource):
 
-    @api.doc('创建投资组合')
+    # @api.doc('删除投资组合')
     @api.expect(login_parser)
     @api.marshal_with(create_rsp_model)
     @login_required
@@ -952,24 +980,5 @@ class PortfolioInfoActionResource(Resource):
         """
         logger.debug('pl_id=%d', _id)
         PortfolioInfo.query.filter(PortfolioInfo.pl_id == _id).update({'is_del': 1})
-        db.session.commit()
-        return {'status': 'ok'}
-
-
-@api.route('/cmp/info/<int:_id>')
-@api.param('_id', '预测ID')
-class PortfolioInfoActionResource(Resource):
-
-    @api.doc('删除指定预测')
-    @api.expect(login_parser)
-    @api.marshal_with(create_rsp_model)
-    @login_required
-    @api.response(404, "参数错误", model=error_model)
-    def delete(self, _id):
-        """
-        删除指定预测
-        """
-        logger.debug('cmp_id=%d', _id)
-        PortfolioCompareInfo.query.filter(PortfolioCompareInfo.cmp_id == _id).update({'is_del': 1})
         db.session.commit()
         return {'status': 'ok'}
