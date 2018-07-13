@@ -40,7 +40,7 @@ login_model = api.model('Login', {
 
 login_parser = reqparse.RequestParser(
 ).add_argument(
-    'accept', location='headers', default='application/json', type=str, help='application/json'
+    'accept', location='headers', default='json', type=str, help='application/json'
 ).add_argument(
     'code', type=str, required=True, help='wx.login() 返回 code'
 ).add_argument(
