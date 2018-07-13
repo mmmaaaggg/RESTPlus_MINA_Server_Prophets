@@ -238,7 +238,7 @@ class AssetCandle(Resource):
             data_df = None
 
         # ret_data = [list(x) for x in data_df.as_matrix()]
-        ret_dic = {'data': [list(x) for x in data_df[item_names].values()] if data_df is not None else [],
+        ret_dic = {'data': [list(x) for x in data_df[item_names].as_matrix()] if data_df is not None else [],
                    'count': data_df.shape[0] if data_df is not None else 0
                    }
         return ret_dic
