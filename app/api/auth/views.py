@@ -19,6 +19,8 @@ from Crypto.Cipher import AES
 from flask import request, current_app, jsonify, session
 from flask_login import login_required, login_user, logout_user, current_user
 from flask_restplus import Namespace, Resource, fields, reqparse
+from flask_restplus._http import HTTPStatus
+from app.api.exceptions import LoginError
 # App Module
 from app.config import config
 from app import db
@@ -38,6 +40,8 @@ login_model = api.model('Login', {
 
 login_parser = reqparse.RequestParser(
 ).add_argument(
+    'accept', location='headers', default='application/json', type=str, help='application/json'
+).add_argument(
     'code', type=str, required=True, help='wx.login() 返回 code'
 ).add_argument(
     'encryptedData', type=str, help='解密加密数据，校验appid'
@@ -46,10 +50,17 @@ login_parser = reqparse.RequestParser(
 ).add_argument(
     'rawData', type=str, help='校验签名，判别数据完整性'
 ).add_argument(
-    'signature', type=str, help='校验签名，判别数据完整性')
+    'signature', type=str, help='校验签名，判别数据完整性'
+)
 
 login_token_parser = reqparse.RequestParser().add_argument(
     'token', type=str, location='headers', required=True, help='登录 token')
+
+login_error_model = api.model('error', {
+    'status': fields.String(description='状态'),
+    'message': fields.String(description='错误信息'),
+    'error_code': fields.Integer(description='错误代码'),
+})
 
 
 def sha1Sign(session_key, rawData):
@@ -80,19 +91,20 @@ class Login(Resource):
     @api.doc('user login')
     @api.expect(login_parser)
     @api.marshal_with(login_model)
+    @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
+    # @api.response(404, "登陆失败", model=login_error_model)
     def get(self):
         """
-    微信小程序注册登陆接口
-    :return:
-    """
+        微信小程序注册登陆接口
+        """
 
         args = login_parser.parse_args()
+        logger.debug("接受登陆请求 args: %s", args)
         code = args['code']
         encryptedData = args['encryptedData'] if 'encryptedData' in args else None
         rawData = args['rawData'] if 'rawData' in args else None
         signature = args['signature'] if 'signature' in args else None
         iv = args['iv'] if 'iv' in args else None
-        logger.debug("接受登陆请求 args: %s", args)
         # logger.debug("接受登陆请求 data: %s", request.data)
         # logger.debug("接受登陆请求 form: %s", request.form)
         # logger.debug("接受登陆请求 json: %s", request.json)
@@ -156,11 +168,12 @@ class Login(Resource):
                     'openid': user.openId,
                     'expired': expired
                     }
-        return jsonify(res)
+        # return res, 404
+        raise LoginError(res['errmsg'], 404, res['errcode'])
 
 
-@api.route('/login_test')
-class LoginTest(Resource):
+@api.route('/login_detection')
+class LoginDetection(Resource):
     """
     登录测试
     """
@@ -208,3 +221,37 @@ class LoginForce(Resource):
                 'openid': user.openId,
                 'expired': expired
                 }
+
+
+@api.route('/exception_test/<int:has_exp>')
+class ExpTest(Resource):
+
+    @api.response(HTTPStatus.UNAUTHORIZED, "登陆失败", model=login_error_model)
+    @api.marshal_with(login_model)
+    @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
+    def get(self, has_exp):
+        """
+        测试异常响应
+        """
+        if has_exp == 0:
+            return {'status': 'ok'}
+        else:
+            raise LoginError('有异常', None, errcode=12334)
+            # from flask import abort
+            # abort(400)
+
+
+# @api.marshal_with(error_model)
+# @api.errorhandler(BadRequest)
+# def not_found(error: BadRequest):
+#     return {'status': 'error', 'message': error.description, 'error_name': error.name}, HTTPStatus.NOT_FOUND[0]
+
+
+@api.errorhandler(LoginError)
+def login_error_handler(error: LoginError):
+    logger.error('error on login| %s', error.description)
+    return {'status': 'error',
+            'message': error.description,
+            'error_name': error.name,
+            'error_code': error.errcode
+            }, HTTPStatus.UNAUTHORIZED
