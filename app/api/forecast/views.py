@@ -28,8 +28,7 @@ from sqlalchemy import func, or_, and_, column, not_
 logger = logging.getLogger()
 
 error_model = api.model('error', {
-    'data': fields.List(fields.Raw),
-    'status': fields.String(description='状态'),
+    'status': fields.String(description='状态', default='error'),
     'message': fields.String(description='错误信息'),
 })
 
