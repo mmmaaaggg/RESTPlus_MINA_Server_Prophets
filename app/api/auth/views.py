@@ -54,7 +54,7 @@ login_parser = reqparse.RequestParser(
 login_token_parser = reqparse.RequestParser().add_argument(
     'token', type=str, location='headers', required=True, help='登录 token')
 
-login_error_model = api.model('error', {
+login_error_model = api.model('login_error', {
     'status': fields.String(description='状态'),
     'message': fields.String(description='错误信息'),
     'error_code': fields.Integer(description='错误代码'),
@@ -226,7 +226,7 @@ class ExpTest(Resource):
 
     @api.response(HTTPStatus.UNAUTHORIZED, "登陆失败", model=login_error_model)
     @api.marshal_with(login_model)
-    @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
+    # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
     def get(self, has_exp):
         """
         测试异常响应
@@ -237,19 +237,3 @@ class ExpTest(Resource):
             raise LoginError('有异常', None, errcode=12334)
             # from flask import abort
             # abort(400)
-
-
-# @api.marshal_with(error_model)
-# @api.errorhandler(BadRequest)
-# def not_found(error: BadRequest):
-#     return {'status': 'error', 'message': error.description, 'error_name': error.name}, HTTPStatus.NOT_FOUND[0]
-
-
-@api.errorhandler(LoginError)
-def login_error_handler(error: LoginError):
-    logger.error('error on login| %s', error.description)
-    return {'status': 'error',
-            'message': error.description,
-            'error_name': error.name,
-            'error_code': error.errcode
-            }, HTTPStatus.UNAUTHORIZED

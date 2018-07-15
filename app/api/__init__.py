@@ -9,11 +9,12 @@
 """
 
 from flask_restplus import Api
-
-# from .cat import api as ns1
+from app.api.exceptions import LoginError
+import logging
 from .auth import api as ns2
 from .forecast import api as ns3
 from .asset import api as ns4
+logger = logging.getLogger()
 api = Api(
     title='MINA Prophets Server',
     version='1.0',
