@@ -8,6 +8,7 @@
 @desc    : 
 """
 from flask_restplus import Namespace, Resource, fields, reqparse
+from werkzeug.exceptions import BadRequest, NotFound
 
 api = Namespace('auth', description='User Auth')
 
