@@ -31,11 +31,11 @@ logger = logging.getLogger()
 
 login_model = api.model('Login', {
     'user_id': fields.Integer(description='The user identifier'),
-    'is_first': fields.String(description="It's a new user"),
-    'got_auth': fields.String(description="It's a auth user"),
+    'is_first': fields.Boolean(description="It's a new user"),
+    'got_auth': fields.Boolean(description="It's a auth user"),
     'token': fields.String(description='User Token'),
     'openid': fields.String(description='User OpenID'),
-    'expired': fields.String(description='Seconds of Expired'),
+    'expired': fields.Integer(description='Seconds of Expired'),
 })
 
 login_parser = reqparse.RequestParser(
