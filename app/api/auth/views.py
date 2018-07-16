@@ -30,12 +30,12 @@ from app.api.auth.models import User
 logger = logging.getLogger()
 
 login_model = api.model('Login', {
-    'user_id': fields.String(required=True, description='The user identifier'),
-    'is_first': fields.Boolean(required=True, description="It's a new user"),
-    'got_auth': fields.Boolean(required=True, description="It's a auth user"),
-    'token': fields.String(required=True, description='User Token'),
-    'openid': fields.String(required=True, description='User OpenID'),
-    'expired': fields.String(required=True, description='Seconds of Expired'),
+    'user_id': fields.Integer(description='The user identifier'),
+    'is_first': fields.String(description="It's a new user"),
+    'got_auth': fields.String(description="It's a auth user"),
+    'token': fields.String(description='User Token'),
+    'openid': fields.String(description='User OpenID'),
+    'expired': fields.String(description='Seconds of Expired'),
 })
 
 login_parser = reqparse.RequestParser(
@@ -89,7 +89,7 @@ class Login(Resource):
     @api.doc('user login')
     @api.expect(login_parser)
     @api.marshal_with(login_model)
-    @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
+    # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
     # @api.response(404, "登陆失败", model=login_error_model)
     def get(self):
         """
