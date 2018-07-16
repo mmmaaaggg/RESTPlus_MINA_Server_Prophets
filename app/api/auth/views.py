@@ -90,7 +90,7 @@ class Login(Resource):
     @api.expect(login_parser)
     @api.marshal_with(login_model)
     # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
-    # @api.response(404, "登陆失败", model=login_error_model)
+    @api.response(HTTPStatus.UNAUTHORIZED, "登陆失败", model=login_error_model)
     def get(self):
         """
         微信小程序注册登陆接口
