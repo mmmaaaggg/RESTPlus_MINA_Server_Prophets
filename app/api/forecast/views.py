@@ -885,16 +885,19 @@ class PortfolioStatisticResource(Resource):
             "select trade_date, nav from " + PortfolioValueDaily.__tablename__ + "  where pl_id = %s order by trade_date",
             db.engine, params=[_id], index_col='trade_date')
         stat_dic_dic = calc_performance(pl_df, freq=None)
-        performance_dic = stat_dic_dic['nav']
-        for key in list(performance_dic.keys()):
-            value = performance_dic[key]
-            if value is None:
-                performance_dic[key] = '-'
-            elif type(value) is date:
-                performance_dic[key] = date_2_str(value)
-            elif type(value) is not str and not np.isfinite(value):
-                performance_dic[key] = '-'
-        ret_data['performance'] = stat_dic_dic['nav']
+        if 'nav' in stat_dic_dic:
+            performance_dic = stat_dic_dic['nav']
+            for key in list(performance_dic.keys()):
+                value = performance_dic[key]
+                if value is None:
+                    performance_dic[key] = '-'
+                elif type(value) is date:
+                    performance_dic[key] = date_2_str(value)
+                elif type(value) is not str and not np.isfinite(value):
+                    performance_dic[key] = '-'
+            ret_data['performance'] = stat_dic_dic['nav']
+        else:
+            logger.warning('stat_dic_dic:\n%s', stat_dic_dic)
 
         # 星标数量
         star_count = db.session.query(func.count()).filter(FavoritePortfolio.pl_id == _id).scalar()
