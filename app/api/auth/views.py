@@ -159,7 +159,7 @@ class Login(Resource):
             token = user.generate_auth_token(expiration=expired)
             current_app.login_user_dic[token] = user
             logger.debug('token: %s' % token)
-            return {'user_id': user.id,
+            return {'userid': user.id,
                     'is_first': is_first,
                     'got_auth': user.got_auth,
                     'token': token,
@@ -213,7 +213,7 @@ class LoginForce(Resource):
         current_app.login_user_dic[token] = user
         logger.warning('用户 [%d] %s 强制登录', user_id, user.username)
         logger.debug('token: %s' % token)
-        return {'user_id': user.id,
+        return {'userid': user.id,
                 'is_first': is_first,
                 'got_auth': user.got_auth,
                 'token': token,
