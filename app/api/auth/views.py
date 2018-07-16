@@ -159,13 +159,15 @@ class Login(Resource):
             token = user.generate_auth_token(expiration=expired)
             current_app.login_user_dic[token] = user
             logger.debug('token: %s' % token)
-            return {'user_id': user.id,
-                    'is_first': is_first,
-                    'got_auth': user.got_auth,
-                    'token': token,
-                    'openid': user.openId,
-                    'expired': expired
-                    }
+            ret_dic = {'user_id': user.id,
+                       'is_first': is_first,
+                       'got_auth': user.got_auth,
+                       'token': token,
+                       'openid': user.openId,
+                       'expired': expired
+                       }
+            logger.debug('用户成功登陆：\n%s', ret_dic)
+            return ret_dic
         # return res, 404
         raise LoginError(res['errmsg'], 404, res['errcode'])
 
@@ -186,8 +188,8 @@ class LoginDetection(Resource):
             logger.debug("%2d) %s = %s", num, key, val)
         logger.debug("%s", type(current_user))
         return {'status': 'ok', 'message': 'Hello world!\nYou have login',
-                        'token': token,
-                        'current_user': str(current_user)}
+                'token': token,
+                'current_user': str(current_user)}
 
 
 @api.route('/login_force/<int:user_id>')
