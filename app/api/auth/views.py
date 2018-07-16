@@ -30,7 +30,7 @@ from app.api.auth.models import User
 logger = logging.getLogger()
 
 login_model = api.model('Login', {
-    'userid': fields.String(required=True, description='The user identifier'),
+    'user_id': fields.String(required=True, description='The user identifier'),
     'is_first': fields.Boolean(required=True, description="It's a new user"),
     'got_auth': fields.Boolean(required=True, description="It's a auth user"),
     'token': fields.String(required=True, description='User Token'),
@@ -159,7 +159,7 @@ class Login(Resource):
             token = user.generate_auth_token(expiration=expired)
             current_app.login_user_dic[token] = user
             logger.debug('token: %s' % token)
-            return {'userid': user.id,
+            return {'user_id': user.id,
                     'is_first': is_first,
                     'got_auth': user.got_auth,
                     'token': token,
@@ -213,7 +213,7 @@ class LoginForce(Resource):
         current_app.login_user_dic[token] = user
         logger.warning('用户 [%d] %s 强制登录', user_id, user.username)
         logger.debug('token: %s' % token)
-        return {'userid': user.id,
+        return {'user_id': user.id,
                 'is_first': is_first,
                 'got_auth': user.got_auth,
                 'token': token,
