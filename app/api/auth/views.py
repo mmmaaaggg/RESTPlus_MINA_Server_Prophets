@@ -211,6 +211,7 @@ class LoginForce(Resource):
         expired = config.SESSION_TIMEOUT_SECONDS
         token = user.generate_auth_token(expiration=expired)
         current_app.login_user_dic[token] = user
+        logger.warning('用户 [%d] %s 强制登录', user_id, user.username)
         logger.debug('token: %s' % token)
         return {'user_id': user.id,
                 'is_first': is_first,

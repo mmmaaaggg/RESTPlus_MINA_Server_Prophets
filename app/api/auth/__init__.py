@@ -15,29 +15,29 @@ api = Namespace('auth', description='User Auth')
 from .views import *
 
 
-@api.errorhandler(BadRequest)
-def login_error_handler(error: BadRequest):
-    # logger.error('error on login| %s', error.description)
-    return {'status': 'error',
-            'message': error.description,
-            'error_name': error.name,
-            }, error.code
-
-
-@api.errorhandler(NotFound)
-def login_error_handler(error: BadRequest):
-    logger.error('error on login| %s', error.description)
-    return {'status': 'error',
-            'message': error.description,
-            'error_name': error.name,
-            }, error.code
-
-
-@api.errorhandler(LoginError)
-def login_error_handler(error: LoginError):
-    # logger.error('error on login| %s', error.description)
-    return {'status': 'error',
-            'message': error.description,
-            'error_name': error.name,
-            'error_code': error.errcode
-            }, HTTPStatus.UNAUTHORIZED
+# @api.errorhandler(BadRequest)
+# def login_error_handler(error: BadRequest):
+#     # logger.error('error on login| %s', error.description)
+#     return {'status': 'error',
+#             'message': error.description,
+#             'error_name': error.name,
+#             }, error.code
+#
+#
+# @api.errorhandler(NotFound)
+# def login_error_handler(error: BadRequest):
+#     logger.error('error on login| %s', error.description)
+#     return {'status': 'error',
+#             'message': error.description,
+#             'error_name': error.name,
+#             }, error.code
+#
+#
+# @api.errorhandler(LoginError)
+# def login_error_handler(error: LoginError):
+#     # logger.error('error on login| %s', error.description)
+#     return {'status': 'error',
+#             'message': error.description,
+#             'error_name': error.name,
+#             'error_code': error.errcode
+#             }, HTTPStatus.UNAUTHORIZED
