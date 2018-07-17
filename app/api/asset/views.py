@@ -7,15 +7,13 @@
 @contact : mmmaaaggg@163.com
 @desc    : 
 """
-
-from app.api.asset import api
+from flask_restplus._http import HTTPStatus
+from app.api.asset import api, logger
 from app import db
 from app.config import config
-import logging
 import pandas as pd
 from flask_restplus import Resource, fields, reqparse
 
-logger = logging.getLogger()
 error_model = api.model('error', {
     'data': fields.List(fields.Raw),
     'status': fields.String(description='状态'),

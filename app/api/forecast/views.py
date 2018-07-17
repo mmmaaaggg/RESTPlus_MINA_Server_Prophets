@@ -9,13 +9,14 @@
 """
 from datetime import timedelta, date
 from flask_restplus import Resource, fields, reqparse
-from app.api.forecast import api
+from flask_restplus._http import HTTPStatus
+from werkzeug.exceptions import BadRequest
+from app.api.forecast import api, logger
 from app import db
 from app.config import config
-from flask import render_template, request, session, url_for, redirect, jsonify
+from flask import request, session
 from flask_login import login_required
 import json
-import logging
 from app.api.auth.models import User
 from app.api.forecast.models import PortfolioInfo, PortfolioData, PortfolioValueDaily, \
     PortfolioCompareResult, PortfolioCompareInfo, FavoriteCompare, FavoritePortfolio
@@ -25,10 +26,14 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import func, or_, and_, column, not_
 
-logger = logging.getLogger()
-
 error_model = api.model('error', {
     'status': fields.String(description='状态', default='error'),
+    'message': fields.String(description='错误信息'),
+})
+
+error_action_model = api.model('error', {
+    'status': fields.String(description='状态', default='error'),
+    'id': fields.Integer(description='操作对象ID'),
     'message': fields.String(description='错误信息'),
 })
 
@@ -106,6 +111,11 @@ create_rsp_model = api.model('create_rsp_model', {
     'id': fields.Integer(description='新增对象ID'),
 })
 
+delete_rsp_model = api.model('delete_rsp_model', {
+    'status': fields.String(descrption='状态'),
+    'id': fields.Integer(description='新增对象ID'),
+})
+
 summary_item_model = api.model('summary_item_model', {
     'name': fields.String('名称'),
     'status': fields.String('状态'),
@@ -130,7 +140,7 @@ class CompareInfoResource(Resource):
     @api.expect(login_parser, cmp_create_model)
     @api.marshal_with(create_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def post(self):
         """
         创建预测信息
@@ -140,24 +150,16 @@ class CompareInfoResource(Resource):
 
         # 添加投资组合信息
         data_obj = PortfolioCompareInfo()
-        try:
-            populate_obj(data_obj, data_dic,
-                         attr_list=["name", "date_from", "date_to", "access_type", "desc"],
-                         error_if_no_key=True)
-            data_obj.params = json.dumps(data_dic['params'])
-        except KeyError as exp:
-            logger.exception('对 PortfolioCompareInfo 对象赋值失败')
-            return {"status": "error", "message": exp.args[0]}, 404
+        populate_obj(data_obj, data_dic,
+                     attr_list=["name", "date_from", "date_to", "access_type", "desc"],
+                     error_if_no_key=True)
+        data_obj.params = json.dumps(data_dic['params'])
         # TODO: 需要进行：1）参数合法性检查 2）pl_id user_id create_dt 等参数不得传入，类似无效参数过滤
         user_id = session.get('user_id')
         data_obj.create_user_id = user_id
-        try:
-            db.session.add(data_obj)
-            db.session.commit()
-            logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.cmp_id, data_obj.__tablename__)
-        except Exception as exp:
-            logger.exception('创建预测失败')
-            return {"status": "error", "message": exp.args[0]}, 404
+        db.session.add(data_obj)
+        db.session.commit()
+        logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.cmp_id, data_obj.__tablename__)
 
         return {"status": "ok", 'id': data_obj.cmp_id}
 
@@ -213,13 +215,14 @@ class CompareSummaryResource(Resource):
 
 @api.route('/cmp/<string:status>')
 @api.param('status', 'my all star verified unverified 其中之一')
-@api.response(404, "item_order 参数错误", model=error_model)
+@api.response(HTTPStatus.BAD_REQUEST, "item_order 参数错误", model=error_model)
 class CompareInfoWithStatusResource(Resource):
 
     @api.doc('获取比较列表数据（分页）')
     @api.expect(paginate_parser)
     @api.marshal_with(paginate_model)
     @login_required
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def get(self, status):
         """
         获取比较列表数据（分页）
@@ -248,7 +251,7 @@ class CompareInfoWithStatusResource(Resource):
             filter_c = or_(PortfolioCompareInfo.create_user_id == user_id, PortfolioCompareInfo.access_type == 'public')
             having_c = or_(column('complete_rate').is_(None), column('complete_rate') < 1)
         else:
-            return {'data': [], 'status': 'error', 'message': 'status 参数错误 %s' % status}, 404
+            raise KeyError('status 参数错误 status = %s' % status)
         # 整理数据
         # logger.debug("data_list_df len:%d", data_list_df.shape[0])
         # data_list_df = data_list_df.where(data_list_df.notna(), None)
@@ -316,7 +319,7 @@ class CompareInfoWithStatusResource(Resource):
 
 @api.route('/cmp/rst/<int:_id>')
 @api.param('_id', 'ID')
-@api.response(404, "参数错误", model=error_model)
+@api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
 class CompareResultResource(Resource):
     """
     预测结果数据（供 charts 使用，无需分页返回）
@@ -351,7 +354,7 @@ class CompareFavorite(Resource):
     @api.expect(login_parser)
     @api.marshal_with(create_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def post(self, _id: int, do: int):
         """
         添加、修改星标
@@ -365,12 +368,9 @@ class CompareFavorite(Resource):
             data_obj = FavoriteCompare()
             data_obj.cmp_id = _id
             data_obj.user_id = user_id
-            try:
-                db.session.add(data_obj)
-                db.session.commit()
-                logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.id, data_obj.__tablename__)
-            except Exception as exp:
-                return {"status": "error", 'id': _id, "message": exp.args[0]}, 404
+            db.session.add(data_obj)
+            db.session.commit()
+            logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.id, data_obj.__tablename__)
 
             return {"status": "ok", 'id': data_obj.id}
 
@@ -381,9 +381,9 @@ class PortfolioInfoActionResource(Resource):
 
     @api.doc('删除指定预测')
     @api.expect(login_parser)
-    @api.marshal_with(create_rsp_model)
+    @api.marshal_with(delete_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def delete(self, _id):
         """
         删除指定预测
@@ -391,14 +391,14 @@ class PortfolioInfoActionResource(Resource):
         logger.debug('cmp_id=%d', _id)
         PortfolioCompareInfo.query.filter(PortfolioCompareInfo.cmp_id == _id).update({'is_del': 1})
         db.session.commit()
-        return {'status': 'ok'}
+        return {'status': 'ok', 'id': _id}
 
 
 @api.route('/pl/data/<int:_id>/<string:status>/<string:method>')
 @api.param('_id', 'ID')
 @api.param('status', '状态 latest 最近一次调仓数据, recent 最近几日调仓数据，日期逆序排列')
 @api.param('method', '以 record 或 date 方式分页显示')
-@api.response(404, "参数错误", model=error_model)
+@api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
 class PortfolioListResource(Resource):
     """
     获取制定投资组合的成分及权重数据（分页）
@@ -408,6 +408,7 @@ class PortfolioListResource(Resource):
     @api.expect(paginate_parser)
     @api.marshal_with(paginate_model)
     @login_required
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def get(self, _id, status, method):
         """
         获取制定投资组合的成分及权重数据（分页）
@@ -422,7 +423,7 @@ class PortfolioListResource(Resource):
         elif method == 'date':
             ret_dic = PortfolioListResource.get_pl_data_list_by_date(_id, status, page_no, count)
         else:
-            return {'data': [], 'status': 'error', 'message': 'method 参数错误 %s' % method}, 404
+            raise KeyError('status 参数错误 method = %s' % method)
         return ret_dic
 
     @staticmethod
@@ -574,7 +575,7 @@ class PortfolioAssetDistributionResource(Resource):
     @api.expect(count_parser)
     @api.marshal_with(data_result_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def get(self, _id, status):
         """
         投资组合资产分布比例
@@ -605,7 +606,7 @@ class PortfolioAssetDistributionResource(Resource):
                 PortfolioData.trade_date, PortfolioData.asset_type, func.sum(PortfolioData.weight).label('weight')
             ).group_by(PortfolioData.trade_date, PortfolioData.asset_type).all()
         else:
-            return {'data': [], 'count': 0, 'status': 'error', 'message': 'status 参数错误 %s' % status}, 404
+            raise KeyError('status 参数错误 status = %s' % status)
 
         # 合并数据结果
         ret_dic_list = []
@@ -647,7 +648,7 @@ class PortfolioListByStatusResource(Resource):
     @api.expect(count_parser)
     @api.marshal_with(data_result_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def get(self, status):
         """
         获取投资组合列表数据
@@ -687,7 +688,7 @@ class PortfolioListByStatusResource(Resource):
             filter_c = None
 
         if filter_c is None:
-            return {'data': [], 'count': 0, 'status': 'error', 'message': 'status 参数错误 %s' % status}, 404
+            raise KeyError('status 参数错误 status = %s' % status)
         else:
             pagination = PortfolioInfo.query.outerjoin(
                 nav_latest_query, PortfolioInfo.pl_id == nav_latest_query.c.pl_id
@@ -740,7 +741,7 @@ class PortfolioInfoResource(Resource):
     @api.expect(login_parser, pl_create_model)
     @api.marshal_with(create_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def post(self):
         """
         创建投资组合
@@ -757,21 +758,13 @@ class PortfolioInfoResource(Resource):
 
         # 添加投资组合信息
         data_obj = PortfolioInfo()
-        try:
-            populate_obj(data_obj, data_dic, attr_list=["name", "access_type", "desc"], error_if_no_key=True)
-        except KeyError as exp:
-            logger.exception("")
-            return {"status": "error", "message": exp.args[0]}, 404
+        populate_obj(data_obj, data_dic, attr_list=["name", "access_type", "desc"], error_if_no_key=True)
         # TODO: 需要进行：1）参数合法性检查 2）pl_id user_id create_dt 等参数不得传入，类似无效参数过滤
         user_id = session.get('user_id')
         data_obj.create_user_id = user_id
-        try:
-            db.session.add(data_obj)
-            db.session.commit()
-            logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.pl_id, data_obj.__tablename__)
-        except Exception as exp:
-            logger.exception("")
-            return {"status": "error", "message": exp.args[0]}, 404
+        db.session.add(data_obj)
+        db.session.commit()
+        logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.pl_id, data_obj.__tablename__)
 
         # 添加投资组合
         if 'pl_data' in data_dic:
@@ -788,7 +781,7 @@ class PortfolioDataUpdateResource(Resource):
     @api.expect(login_parser, pl_data_model)
     @api.marshal_with(create_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_model)
     def put(self, _id):
         """
         修改投资组合
@@ -799,9 +792,11 @@ class PortfolioDataUpdateResource(Resource):
         # TODO: 增加权限检查，只能修改自己创建的投资组合
         # TODO: 交易日期必须大于等于当日，如果下午3点以后不得等于当日
         if data_dic is None:
-            return jsonify({"status": "error", "message": "no json"})
+            raise BadRequest('缺少json请求数据')
+            # return jsonify({"status": "error", "message": "no json"})
         if "data" not in data_dic:
-            return jsonify({"status": "error", "message": "'data' key in json"})
+            # return jsonify({"status": "error", "message": "'data' key in json"})
+            raise BadRequest('json 请求数据缺少 data 数据')
         # data = json_dic["data"]
         add_pl_data(_id, data_dic)
 
@@ -943,7 +938,7 @@ class CompareFavorite(Resource):
     @api.expect(login_parser)
     @api.marshal_with(create_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.BAD_REQUEST, "参数错误", model=error_action_model)
     def post(self, _id: int, do: int):
         """
         添加、修改星标
@@ -958,12 +953,9 @@ class CompareFavorite(Resource):
             data_obj = FavoritePortfolio()
             data_obj.pl_id = _id
             data_obj.user_id = user_id
-            try:
-                db.session.add(data_obj)
-                db.session.commit()
-                logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.id, data_obj.__tablename__)
-            except Exception as exp:
-                return jsonify({"status": "error", "message": exp.args[0]})
+            db.session.add(data_obj)
+            db.session.commit()
+            logger.info('%s：id=%d 成功插入数据库 %s', data_obj.__class__.__name__, data_obj.id, data_obj.__tablename__)
 
             return {"status": "ok", 'id': data_obj.id}
 
@@ -974,14 +966,14 @@ class PortfolioInfoActionResource(Resource):
 
     # @api.doc('删除投资组合')
     @api.expect(login_parser)
-    @api.marshal_with(create_rsp_model)
+    @api.marshal_with(delete_rsp_model)
     @login_required
-    @api.response(404, "参数错误", model=error_model)
+    @api.response(HTTPStatus.UNAUTHORIZED, "无权进行此操作", model=error_action_model)
     def delete(self, _id):
         """
-        创建投资组合
+        删除指定投资组合
         """
         logger.debug('pl_id=%d', _id)
         PortfolioInfo.query.filter(PortfolioInfo.pl_id == _id).update({'is_del': 1})
         db.session.commit()
-        return {'status': 'ok'}
+        return {'status': 'ok', 'id': _id}

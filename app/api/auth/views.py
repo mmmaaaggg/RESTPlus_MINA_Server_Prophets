@@ -89,7 +89,7 @@ class Login(Resource):
     @api.doc('user login')
     @api.expect(login_parser)
     @api.marshal_with(login_model)
-    # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
+    # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)  # 只能试用一个 marshal_with
     @api.response(HTTPStatus.UNAUTHORIZED, "登陆失败", model=login_error_model)
     def get(self):
         """
@@ -195,6 +195,7 @@ class LoginDetection(Resource):
 @api.route('/login_force/<int:user_id>')
 @api.param('user_id', '强制以制定id用户身份登录')
 class LoginForce(Resource):
+
     @api.doc('user login')
     @api.marshal_with(login_model)
     def get(self, user_id=1):
@@ -225,18 +226,28 @@ class LoginForce(Resource):
 
 
 @api.route('/exception_test/<int:has_exp>')
+@api.hide
 class ExpTest(Resource):
 
     @api.response(HTTPStatus.UNAUTHORIZED, "登陆失败", model=login_error_model)
-    @api.marshal_with(login_model)
+    @api.marshal_with(login_model, code=HTTPStatus.OK)
     # @api.marshal_with(login_error_model, code=HTTPStatus.UNAUTHORIZED)
     def get(self, has_exp):
         """
         测试异常响应
         """
         if has_exp == 0:
-            return {'status': 'ok'}
-        else:
+            return {
+                       "expired": 0,
+                       "is_first": True,
+                       "token": "tttttttttttttttttttt",
+                       "openid": "oooooooooooooooo",
+                       "user_id": 123,
+                       "got_auth": True
+                   }, HTTPStatus.OK
+        elif has_exp == 1:
             raise LoginError('有异常', None, errcode=12334)
             # from flask import abort
             # abort(400)
+        else:
+            raise ValueError('数值错误')
