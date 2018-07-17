@@ -96,18 +96,34 @@ pl_create_model = api.model('portfolio_create_model', {
     'pl_data': fields.Nested(pl_data_model, description='投资组合信息'),
 })
 
+cmp_params_model = api.model('cmp_params_model', {
+    "asset_type_1": fields.String(description='资产类别：index stock fund future portfolio'),
+    "asset_type_2": fields.String(description='资产类别：index stock fund future portfolio value'),
+    "asset_type_3": fields.String(description='资产类别：index stock fund future portfolio value', required=False),
+    "asset_1": fields.String(description='资产代码（例如："000300.SH"）或投资组合ID', required=False),
+    "value_1": fields.Float(description='数值', required=False),
+    "asset_2": fields.String(description='资产代码（例如："000300.SH"）或投资组合ID', required=False),
+    "value_2": fields.Float(description='数值', required=False),
+    "asset_3": fields.String(description='资产代码（例如："000300.SH"）或投资组合ID', required=False),
+    "value_3": fields.Float(description='数值', required=False),
+    "compare_type": fields.String(
+        description='比较方式 相对收益率 "rel.rr", 绝对收益率 "abs.rr", 绝对点位"abs.fix_point"'),
+    "compare_method": fields.String(description="比较符 '>', '<', 'between'"),
+    "date_start": fields.Date(description='起始计算日期，仅用于对收益率比较时使用', required=False),
+})
+
 cmp_create_model = api.model('portfolio_create_model', {
     'name': fields.String(description='名称', required=True),
     'access_type': fields.String(description='public 公开 private 私有', required=True),
     'date_from': fields.Date(description='起始日期', required=False),
     'date_to': fields.Date(description='起始日期', required=False),
     'desc': fields.String(description='描述信息', required=True),
-    'params': fields.String(description='预测参数'),
+    'params': fields.Nested(cmp_params_model, description='投资组合信息'),
 })
 
 create_rsp_model = api.model('create_rsp_model', {
     'status': fields.String(descrption='状态'),
-    'message': fields.String(description='备注'),
+    'message': fields.String(description='备注', required=False),
     'id': fields.Integer(description='新增对象ID'),
 })
 
@@ -153,6 +169,7 @@ class CompareInfoResource(Resource):
         populate_obj(data_obj, data_dic,
                      attr_list=["name", "date_from", "date_to", "access_type", "desc"],
                      error_if_no_key=True)
+        # logger.debug("data_dic['params']<%s>: %s", type(data_dic['params']), data_dic['params'])
         data_obj.params = json.dumps(data_dic['params'])
         # TODO: 需要进行：1）参数合法性检查 2）pl_id user_id create_dt 等参数不得传入，类似无效参数过滤
         user_id = session.get('user_id')
