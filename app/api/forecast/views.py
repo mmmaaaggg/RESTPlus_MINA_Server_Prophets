@@ -99,10 +99,10 @@ pl_create_model = api.model('portfolio_create_model', {
 cmp_create_model = api.model('portfolio_create_model', {
     'name': fields.String(description='名称', required=True),
     'access_type': fields.String(description='public 公开 private 私有', required=True),
-    'date_from': fields.Date(description='起始日期'),
-    'date_to': fields.Date(description='起始日期'),
+    'date_from': fields.Date(description='起始日期', required=False),
+    'date_to': fields.Date(description='起始日期', required=False),
     'desc': fields.String(description='描述信息', required=True),
-    'params': fields.Nested(pl_data_model, description='投资组合信息'),
+    'params': fields.String(description='预测参数'),
 })
 
 create_rsp_model = api.model('create_rsp_model', {
