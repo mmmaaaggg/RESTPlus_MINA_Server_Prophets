@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import DeclarativeMeta
 import json
 from datetime import date, datetime, timedelta
-from utils.fh_utils import date_2_str
+from app.utils.fh_utils import date_2_str
 
 
 class SessionWrapper:
