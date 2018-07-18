@@ -10,7 +10,7 @@
 from celery import Celery
 
 
-def make_celery(app) -> Celery:
+def make_celery(app)->Celery:
     """
     官方文档推荐做法
     http://flask.pocoo.org/docs/0.12/patterns/celery/
