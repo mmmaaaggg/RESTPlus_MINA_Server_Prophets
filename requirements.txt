@@ -7,3 +7,4 @@ pandas
 xlrd
 pyOpenSSL
 celery
+redis
