@@ -161,6 +161,10 @@ class CompareInfoResource(Resource):
         """
         创建预测信息
         """
+        logger.debug("request.args: %s", request.args)
+        logger.debug("request.values: %s", request.values)
+        logger.debug("request.json: %s", request.json)
+        logger.debug("request.data: %s", request.data)
         data_dic = request.get_json() or request.form
         logger.debug("data_dic: %s", data_dic)
 
