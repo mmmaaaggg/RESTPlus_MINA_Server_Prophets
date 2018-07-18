@@ -5,11 +5,17 @@
 ### 激活 venv
 windows 下
 ```commandline
+python3 -m venv ./venv 
 .\venv\Scripts\activate.bat
+pip3 install -r requirements.txt
 ```
+部分模块可能会安装失败，需要下载wheel文件手动安装
+
 linux 下
 ```bash
-source ../Prophet/venv/bin/activate
+python3 -m venv ./venv 
+source ./venv/bin/activate
+pip3 install -r requirements.txt
 ```
 
 ### 启动 App
