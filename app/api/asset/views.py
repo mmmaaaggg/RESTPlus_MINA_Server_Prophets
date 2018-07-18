@@ -74,7 +74,7 @@ class Asset(Resource):
         logger.debug('搜索条件：%s', search_term)
         param_str = "%%" + search_term + '%%'
         # 查找投资组合
-        sql_str = """SELECT 'pl' AS asset_type, pl_id asset_code,
+        sql_str = """SELECT 'portfolio' AS asset_type, pl_id asset_code,
          name asset_name, concat(pl_id, ' : ', pl_info.name) text 
          FROM pl_info WHERE pl_info.name LIKE %s LIMIT 50"""
         data_df = pd.read_sql(sql_str, db.engine, params=[param_str])
