@@ -11,9 +11,9 @@ import os
 import logging
 from logging.config import dictConfig
 import platform
-# IS_LINUX_OS = platform.os.name != 'nt'
-# if IS_LINUX_OS:
-#     from celery.schedules import crontab
+IS_LINUX_OS = platform.os.name != 'nt'
+if IS_LINUX_OS:
+    from celery.schedules import crontab
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -22,19 +22,19 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # os.getenv() enables configuration through OS environment variables
 class ConfigClass(object):
     # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or '***'
-    API_KEY = os.environ.get('API_KEY') or '***'
-    APP_ID = '***'
-    MCH_ID = '***'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or '****'
+    API_KEY = os.environ.get('API_KEY') or '****'
+    APP_ID = '****'
+    MCH_ID = '****'
     # UPLOAD_FOLDER = '/home/ubuntu/SweetHeart/imgs/upload'
     ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'JPG', 'jpeg', 'gif'])
 
     # Flask Sql Alchemy settings
     BIND_DB_NAME_MD = 'db_md'
     # SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL',     'sqlite:///basic1_app.sqlite')
-    SQLALCHEMY_DATABASE_URI = 'mysql://mg:***@10.0.3.66/prophet'
+    SQLALCHEMY_DATABASE_URI = 'mysql://mg:****@10.0.3.66/prophet'
     SQLALCHEMY_BINDS = {
-        BIND_DB_NAME_MD: 'mysql://mg:***@10.0.3.66/fof_ams_dev'
+        BIND_DB_NAME_MD: 'mysql://mg:****@10.0.3.66/fof_ams_dev'
     }
     CSRF_ENABLED = True
 
@@ -43,7 +43,7 @@ class ConfigClass(object):
     USER_SEND_REGISTERED_EMAIL = False
     USER_SEND_USERNAME_CHANGED_EMAIL = False
     MAIL_USERNAME = os.getenv('MAIL_USERNAME', '265590706@qq.com')
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '***')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '****')
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '"MyApp" <265590706@qq.com>')
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.qq.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', '465'))
@@ -55,11 +55,11 @@ class ConfigClass(object):
     # Celery settings
     CELERY_BROKER_URL = 'redis://127.0.0.1:6379',
     CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379'
-    # CELERY_ACCEPT_CONTENT = ['json', 'pickle']
+    CELERY_ACCEPT_CONTENT = ['json', 'pickle']
     CELERY_TIMEZONE = 'Asia/Shanghai'
     # CELERYBEAT_SCHEDULE = {
     #     'ptask': {
-    #         'task': 'bg_tasks.task.chain_task',
+    #         'task': 'celery_tasks.task.chain_task',
     #         # 'schedule': timedelta(seconds=5),
     #         'schedule': crontab(hour='18') if IS_LINUX_OS else None,
     #         # 'args': (16, 73),  # 当前任务没有参数
@@ -118,9 +118,25 @@ class ConfigClass(object):
     dictConfig(logging_config)
 
 
+class ECSConfig(ConfigClass):
+    SQLALCHEMY_DATABASE_URI = 'mysql://mg:****@****/prophet'
+    SQLALCHEMY_BINDS = {
+         ConfigClass.BIND_DB_NAME_MD: 'mysql://mg:****@****/md_db'
+    }
 
-
-class LocalConfig(ConfigClass):
+    # Celery settings
+    CELERY_BROKER_URL = 'redis://127.0.0.1:6379',
+    CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379'
+    CELERY_ACCEPT_CONTENT = ['json', 'pickle']
+    CELERY_TIMEZONE = 'Asia/Shanghai'
+    CELERYBEAT_SCHEDULE = {
+        'ptask': {
+            'task': 'celery_tasks.task.chain_task',
+            # 'schedule': timedelta(seconds=5),
+            'schedule': crontab(hour='18') if IS_LINUX_OS else None,
+            # 'args': (16, 73),  # 当前任务没有参数
+        },
+    }
 
     # 开启 HTTPS 服务
     APP_ENABLE_SSL = True
@@ -128,4 +144,13 @@ class LocalConfig(ConfigClass):
     APP_PORT = 443
 
 
-config = ConfigClass()
+class LocalConfig(ConfigClass):
+    # Celery settings
+    CELERY_BROKER_URL = 'redis://192.168.239.131:6379/0'
+    CELERY_RESULT_BACKEND = 'redis://192.168.239.131:6379/1'
+    # task_serializer = 'json'
+    CELERY_TIMEZONE = 'Asia/Shanghai'
+    CELERYD_CONCURRENCY = 1  # celery worker的并发数 也是命令行-c指定的数目,事实上实践发现并不是worker也多越好,保证任务不堆积,加上一定新增任务的预留就可以
+
+
+config = ECSConfig()
