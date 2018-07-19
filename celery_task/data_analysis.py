@@ -9,12 +9,13 @@
 """
 from collections import OrderedDict
 from datetime import date, timedelta
+from sqlalchemy import func, or_, and_, column, not_
 from app import db
 from app.api.forecast.models import PortfolioInfo, PortfolioData, PortfolioValueDaily, PortfolioCompareInfo, \
     PortfolioCompareResult
 import pandas as pd
 from app.utils.fh_utils import str_2_date, date_2_str
-from app.utils.db_utils import with_db_session
+# from app.utils.db_utils import with_db_session
 from app.config import config
 import logging
 import json
@@ -30,16 +31,17 @@ ASSET_TYPE_TABLE_NAME_DIC = {
 }
 
 
-def update_pl_value_daily(pl_id, date_from, date_to, name=''):
+def update_pl_value_daily(pl_id, date_from, date_to, name='')->pd.DataFrame:
     """
     更新指定日期范围内组合每日收益率
     :param pl_id:
     :param date_from:
     :param date_to:
+    :param name:
     :return:
     """
     # logger.debug('kwargs: %s', kwargs)
-    rr_tot_s = None
+    rr_tot_df = None
     date_from = str_2_date(date_from)
     date_to = str_2_date(date_to)
     # TODO 根据pl_info 指定的计算方法进行每日投资组合计算，目前默认统计的是每日的收益率
@@ -62,13 +64,13 @@ ON dt_frm.pl_id = dt_to.pl_id"""
     trade_date_range_df = pd.read_sql(sql_str, db.engine,
                                       params=[date_from, pl_id, date_to, pl_id, date_from])
     if trade_date_range_df.shape[0] == 0:
-        logger.debug('pl_id: %d %s [%s-%s] 没有数据',
+        logger.debug('pl_id=%d %s [%s %s] 没有数据',
                      pl_id, name, date_from, date_to)
-        return rr_tot_s
+        return rr_tot_df
     elif trade_date_range_df.shape[0] > 1:
-        logger.warning('pl_id: %d %s [%s-%s] 存在 %d 条记录',
+        logger.warning('pl_id=%d %s [%s %s] 存在 %d 条记录',
                        pl_id, name, date_from, date_to, trade_date_range_df.shape[0])
-        return rr_tot_s
+        return rr_tot_df
 
     # 获取日期段内的全部组合
     date_range_to = trade_date_range_df['date_to'][0]
@@ -77,9 +79,9 @@ ON dt_frm.pl_id = dt_to.pl_id"""
     WHERE pl_id = %s AND trade_date BETWEEN %s AND %s"""
     pl_data_df_all = pd.read_sql(sql_str, db.engine, params=[pl_id, date_range_from, date_range_to])
     if pl_data_df_all.shape[0] == 0:
-        logger.warning('pl_id: %d %s [%s-%s] 没有有效的数据[%s - %s]',
+        logger.warning('pl_id=%d %s [%s %s] 没有有效的数据[%s - %s]',
                        pl_id, name, date_from, date_to, date_range_to, date_range_from)
-        return rr_tot_s
+        return rr_tot_df
     dfg = pl_data_df_all.groupby('trade_date')
     trade_date_sorted_dic = OrderedDict()
     trade_date_sorted_list = []
@@ -93,9 +95,9 @@ ON dt_frm.pl_id = dt_to.pl_id"""
         trade_date_from_cur = trade_date_sorted_list[0]
         trade_date_range_frm = date_from if trade_date_from_cur < date_from else trade_date_from_cur
         if trade_date_range_frm > date_to:
-            logger.warning('pl_id: %d %s [%s-%s] 日期范围 [%s - %s] 无效',
+            logger.warning('pl_id=%d %s [%s %s] 日期范围 [%s - %s] 无效',
                            pl_id, name, date_from, date_to, trade_date_range_frm, date_to)
-            return rr_tot_s
+            return rr_tot_df
         trade_date_sorted_dic[trade_date_from_cur]['date_from'] = trade_date_range_frm
         trade_date_sorted_dic[trade_date_from_cur]['date_to'] = date_to
     else:
@@ -114,7 +116,7 @@ ON dt_frm.pl_id = dt_to.pl_id"""
                 trade_date_range_to = date_to
             # 检查有效性
             if trade_date_range_frm > trade_date_range_to:
-                logger.debug('pl_id: %d %s [%s-%s] %d 日期范围 [%s - %s] 无效',
+                logger.debug('pl_id=%d %s [%s %s] %d 日期范围 [%s - %s] 无效',
                              pl_id, name, date_from, date_to, idx, trade_date_range_frm, trade_date_range_to)
                 continue
             trade_date_sorted_dic[trade_date_from_cur]['date_from'] = trade_date_range_frm
@@ -128,24 +130,41 @@ ON dt_frm.pl_id = dt_to.pl_id"""
             if rr_s is not None and rr_s.shape[0] > 0:
                 rr_s_list.append(rr_s)
     if len(rr_s_list) == 0:
-        logger.warning('pl_id: %d %s [%s-%s] 日期范围 没有 rr 结果',
+        logger.warning('pl_id=%d %s [%s %s] 日期范围 没有 rr 结果',
                        pl_id, name, date_from, date_to)
-        return rr_tot_s
+        return rr_tot_df
     # 合并计算结果
     rr_tot_s = pd.concat(rr_s_list).rename('rr')
     rr_tot_df = pd.DataFrame(rr_tot_s)
     rr_tot_df['pl_id'] = pl_id
     # 更新数据库
-    with with_db_session(db.engine) as session:
-        session.execute(
-            'DELETE FROM pl_value_daily WHERE trade_date BETWEEN :date_from AND :date_to AND pl_id = :pl_id',
-            params={"date_from": date_2_str(rr_tot_s.index.min()),
-                    "date_to": date_2_str(rr_tot_s.index.max()),
-                    'pl_id': pl_id}
+    # 删除数据库中历史数据
+    # with with_db_session(db.engine) as session:
+    #     session.execute(
+    #         'DELETE FROM pl_value_daily WHERE trade_date BETWEEN :date_from AND :date_to AND pl_id = :pl_id',
+    #         params={"date_from": date_2_str(rr_tot_s.index.min()),
+    #                 "date_to": date_2_str(rr_tot_s.index.max()),
+    #                 'pl_id': pl_id}
+    #     )
+    #     session.commit()
+    PortfolioValueDaily.query.filter(
+        PortfolioValueDaily.pl_id == pl_id,
+        PortfolioValueDaily.trade_date >= rr_tot_s.index.min()
+    ).delete()
+    db.session.commit()
+    # 获取最新净值
+    nav_latest = db.session.query(PortfolioValueDaily.nav).filter(
+        PortfolioValueDaily.pl_id == pl_id,
+        PortfolioValueDaily.trade_date == (
+            db.session.query(func.max(PortfolioValueDaily.trade_date)).filter(
+                PortfolioValueDaily.pl_id == pl_id)
         )
-        session.commit()
+    ).scalar()
+    # 计算此后日净值
+    # logger.info('nav_latest=%f', nav_latest)
+    rr_tot_df['nav'] = (rr_tot_df['rr'] + 1).cumprod() * (float(nav_latest) if nav_latest is not None else 1)
     rr_tot_df.to_sql("pl_value_daily", db.engine, if_exists='append')
-    return rr_tot_s
+    return rr_tot_df
 
 
 def get_trade_date_range_df(date_from, date_to, pl_df: pd.DataFrame):
@@ -221,7 +240,7 @@ def get_trade_date_range_df(date_from, date_to, pl_df: pd.DataFrame):
             trade_date_range_sub_df["asset_type"] = asset_type
             trade_date_range_df_list.append(trade_date_range_sub_df)
         else:
-            logger.debug('[%s-%s] asset_type %s 没有数据', date_from, date_to, asset_type, in_list_str)
+            logger.debug('[%s %s] asset_type %s 没有数据', date_from, date_to, asset_type, in_list_str)
 
     # 整合数据
     if len(trade_date_range_df_list) > 0:
@@ -244,7 +263,7 @@ def calc_portfolio_rr(date_from, date_to, pl_df: pd.DataFrame):
     trade_date_range_df = get_trade_date_range_df(date_from, date_to, pl_df)
 
     if trade_date_range_df is None or trade_date_range_df.shape[0] == 0:
-        logger.debug('[%s-%s] %s 没有数据', date_from, date_to, list(pl_df['asset_code']))
+        logger.debug('[%s %s] %s 没有数据', date_from, date_to, list(pl_df['asset_code']))
         return
 
     # 分别计算每日收益率
@@ -343,16 +362,16 @@ WHERE date_from <= date_to AND date_to >= %s"""
     data_count = date_range_df.shape[0]
     if data_count > 0:
         for data_num, date_range_dic in date_range_df.to_dict(orient='index').items():
-            logger.debug('%d/%d) 更新 pl_id=%d %s [%s  %s]',
+            logger.debug('%d/%d) 更新 pl_id=%d %s [%s %s]',
                          data_num + 1, data_count, date_range_dic['pl_id'], date_range_dic['name'],
                          date_range_dic['date_from'], date_range_dic['date_to'])
-            rr_tot_s = update_pl_value_daily(**date_range_dic)
-            if rr_tot_s is not None:
-                date_max = max(rr_tot_s.index)
-                logger.debug('%d/%d) 更新 pl_id=%d %s [%s  %s] 到最新日期 %s',
+            rr_tot_df = update_pl_value_daily(**date_range_dic)
+            if rr_tot_df is not None:
+                date_max = max(rr_tot_df.index)
+                logger.debug('%d/%d) 更新 pl_id=%d %s [%s %s] 到最新日期 %s 更新 %d 条记录',
                              data_num + 1, data_count, date_range_dic['pl_id'], date_range_dic['name'],
                              date_range_dic['date_from'], date_range_dic['date_to'],
-                             date_max)
+                             date_max, rr_tot_df.shape[0])
                 # 更新状态
                 if date_range_dic['date_to'] is not None and str_2_date(date_range_dic['date_to']) <= date_max:
                     PortfolioValueDaily.query.filter(
@@ -597,11 +616,11 @@ if __name__ == "__main__":
     from app.app import app
 
     # 测试 更新指定日期区间的投资组合计算结果
-    # pl_id, date_from, date_to = 2, '2000-01-01', '2018-5-1'
+    # pl_id, date_from, date_to = 2, '2018-03-8', '2018-5-1'
     # update_pl_value_daily(pl_id, date_from, date_to)
 
     # 测试 更新全部投资组合历史收益率
-    force_update_since_trade_date = None  # '2018-01-01'
+    force_update_since_trade_date = '2000-01-01'
     update_pl_all(force_update_since_trade_date=force_update_since_trade_date)
 
     # 测试 更新指定日期区间的预测结果
