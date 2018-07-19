@@ -188,11 +188,14 @@ class CompareInfoResource(Resource):
 @api.route('/cmp/summary')
 class CompareSummaryResource(Resource):
 
-    @api.doc('获取比较列表汇总信息')
+    @api.doc('获取预测比较汇总信息')
     @api.expect(login_parser)
     @api.marshal_with(summary_model)
     @login_required
     def get(self):
+        """
+        获取预测比较汇总信息：待验证，已验证，关注预言 数量及对应 status
+        """
         user_id = session.get('user_id')
         sql_str = """SELECT sum(if(trade_date_max IS NULL, 0, if(trade_date_max<cmp_info.date_to, 1, 0))) unverified,
                 sum(if(trade_date_max IS NULL, 0, if(trade_date_max>=cmp_info.date_to, 1, 0))) verified
@@ -207,10 +210,7 @@ class CompareSummaryResource(Resource):
         raw = db.engine.execute(sql_str).first()
         unverified, verified = raw
 
-        favorite = db.session.query(func.count(PortfolioCompareInfo.cmp_id)).join(
-            FavoriteCompare,
-            and_(PortfolioCompareInfo.cmp_id == FavoriteCompare.cmp_id, FavoriteCompare.user_id == user_id)
-        ).scalar()
+        favorite = db.session.query(func.count()).filter(FavoriteCompare.user_id == user_id).scalar()
 
         ret_data = {
             'data': [
@@ -413,6 +413,48 @@ class PortfolioInfoActionResource(Resource):
         PortfolioCompareInfo.query.filter(PortfolioCompareInfo.cmp_id == _id).update({'is_del': 1})
         db.session.commit()
         return {'status': 'ok', 'id': _id}
+
+
+@api.route('/pl/summary')
+class PortfolioSummaryResource(Resource):
+
+    @api.doc('获取投资组合汇总信息')
+    @api.expect(login_parser)
+    @api.marshal_with(summary_model)
+    @login_required
+    def get(self):
+        """
+        获取投资组合汇总信息：全部组合，我的组合，关注组合 数量及对应 status
+        """
+        user_id = session.get('user_id')
+
+        count_all, count_my = db.session.query(
+            func.count().label('all'),
+            func.sum(func.if_(PortfolioInfo.create_user_id == user_id, 1, 0))
+        ).filter(PortfolioInfo.is_del == 0).first()
+
+        favorite = db.session.query(func.count()).filter(FavoritePortfolio.user_id == user_id).scalar()
+
+        ret_data = {
+            'data': [
+                {
+                    "name": "全部",
+                    "status": "all",
+                    "count": float(count_all)
+                },
+                {
+                    "name": "我的",
+                    "status": "my",
+                    "count": float(count_my)
+                },
+                {
+                    "name": "关注组合",
+                    "status": "favorite",
+                    "count": float(favorite)
+                }
+            ]
+        }
+        return ret_data
 
 
 @api.route('/pl/data/<int:_id>/<string:status>/<string:method>')
