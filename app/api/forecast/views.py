@@ -990,7 +990,7 @@ class PortfolioStatisticResource(Resource):
             func.count(
                 db.session.query(PortfolioValueDaily.pl_id).group_by(PortfolioValueDaily.pl_id).subquery().c.pl_id)
         ).scalar()
-        ret_data['others']['rank'] = float(nav_rank_count / pl_count_has_nav)
+        ret_data['others']['rank'] = 0 if pl_count_has_nav == 0 else float(nav_rank_count / pl_count_has_nav)
         return ret_data
 
 

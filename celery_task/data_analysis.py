@@ -240,7 +240,7 @@ def get_trade_date_range_df(date_from, date_to, pl_df: pd.DataFrame):
             trade_date_range_sub_df["asset_type"] = asset_type
             trade_date_range_df_list.append(trade_date_range_sub_df)
         else:
-            logger.debug('[%s %s] asset_type %s 没有数据', date_from, date_to, asset_type, in_list_str)
+            logger.debug('[%s %s] asset_type %s [%s] 没有数据', date_from, date_to, asset_type, in_list_str)
 
     # 整合数据
     if len(trade_date_range_df_list) > 0:
