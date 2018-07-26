@@ -208,7 +208,7 @@ class CompareSummaryResource(Resource):
                 ON cmp_info.cmp_id = cmp_rslt.cmp_id
                 WHERE is_del=0"""
         raw = db.engine.execute(sql_str).first()
-        unverified, verified = raw
+        count_unverified, count_verified = raw
 
         favorite = db.session.query(func.count()).filter(FavoriteCompare.user_id == user_id).scalar()
 
@@ -217,12 +217,12 @@ class CompareSummaryResource(Resource):
                 {
                     "name": "待验证",
                     "status": "unverified",
-                    "count": float(unverified)
+                    "count": float(count_unverified)
                 },
                 {
                     "name": "已验证",
                     "status": "verified",
-                    "count": float(verified)
+                    "count": float(count_verified)
                 },
                 {
                     "name": "关注预言",
