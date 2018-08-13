@@ -859,6 +859,7 @@ class PortfolioDataUpdateResource(Resource):
             # return jsonify({"status": "error", "message": "no json"})
         if "data" not in data_dic:
             # return jsonify({"status": "error", "message": "'data' key in json"})
+            logger.error('请求数据：%s', data_dic)
             raise BadRequest('json 请求数据缺少 data 数据')
         # data = json_dic["data"]
         add_pl_data(_id, data_dic)
