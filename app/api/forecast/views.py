@@ -853,7 +853,7 @@ class PortfolioDataUpdateResource(Resource):
         # logger.debug("data_dic(get_json): %s", data_dic)
         # data_dic = request.args
         # logger.debug("data_dic(args): %s", data_dic)
-        data_dic = request.data
+        data_dic = str(request.data, encoding='utf-8')
         logger.debug("data_dic(data): %s", data_dic)
         # data_dic = request.values
         # logger.debug("data_dic(values): %s", data_dic)
