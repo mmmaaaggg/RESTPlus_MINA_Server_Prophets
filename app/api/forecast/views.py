@@ -853,6 +853,10 @@ class PortfolioDataUpdateResource(Resource):
         logger.debug("data_dic(get_json): %s", data_dic)
         data_dic = request.args
         logger.debug("data_dic(args): %s", data_dic)
+        data_dic = request.data
+        logger.debug("data_dic(data): %s", data_dic)
+        data_dic = request.values
+        logger.debug("data_dic(values): %s", data_dic)
 
         # TODO: 增加权限检查，只能修改自己创建的投资组合
         # TODO: 交易日期必须大于等于当日，如果下午3点以后不得等于当日
