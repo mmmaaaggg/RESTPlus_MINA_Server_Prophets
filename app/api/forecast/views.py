@@ -849,7 +849,8 @@ class PortfolioDataUpdateResource(Resource):
         """
         修改投资组合
         """
-        data_dic = request.get_json() or request.form
+        # data_dic = request.get_json() or request.form
+        data_dic = login_parser.parse_args()
         logger.debug("data_dic: %s", data_dic)
 
         # TODO: 增加权限检查，只能修改自己创建的投资组合
