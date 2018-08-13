@@ -853,7 +853,7 @@ class PortfolioDataUpdateResource(Resource):
         # logger.debug("data_dic(get_json): %s", data_dic)
         # data_dic = request.args
         # logger.debug("data_dic(args): %s", data_dic)
-        data_dic = str(request.data, encoding='utf-8')
+        data_dic = json.loads(str(request.data, encoding='utf-8'))
         logger.debug("data_dic(data): %s", data_dic)
         # data_dic = request.values
         # logger.debug("data_dic(values): %s", data_dic)
@@ -888,6 +888,7 @@ def add_pl_data(_id, pl_data_dic: dict):
         PortfolioData.pl_id == _id,
         PortfolioData.trade_date == date_str
     ).delete()
+    logger.debug("pl_id=%d: 剔除 %s 历史数据", _id, date_str)
     # 获取上一个调仓日时的持仓纪录
     pl_data_obj_list_last_date = PortfolioData.query.filter(
         PortfolioData.pl_id == _id,
