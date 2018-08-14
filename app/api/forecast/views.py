@@ -112,7 +112,7 @@ cmp_params_model = api.model('cmp_params_model', {
     "date_start": fields.Date(description='起始计算日期，仅用于对收益率比较时使用', required=False),
 })
 
-cmp_create_model = api.model('portfolio_create_model', {
+cmp_create_model = api.model('cmp_create_model', {
     'name': fields.String(description='名称', required=True),
     'access_type': fields.String(description='public 公开 private 私有', required=True),
     'date_from': fields.Date(description='起始日期', required=False),
