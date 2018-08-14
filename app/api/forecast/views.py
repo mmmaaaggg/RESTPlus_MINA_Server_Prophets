@@ -21,7 +21,7 @@ from app.api.auth.models import User
 from app.api.forecast.models import PortfolioInfo, PortfolioData, PortfolioValueDaily, \
     PortfolioCompareResult, PortfolioCompareInfo, FavoriteCompare, FavoritePortfolio
 from app.api.asset.views import get_asset_name
-from app.utils.fh_utils import date_2_str, populate_obj, calc_performance, datetime_2_str
+from app.utils.fh_utils import date_2_str, populate_obj, calc_performance, datetime_2_str, try_2_float
 import pandas as pd
 import numpy as np
 from sqlalchemy import func, or_, and_, column, not_
@@ -217,17 +217,17 @@ class CompareSummaryResource(Resource):
                 {
                     "name": "待验证",
                     "status": "unverified",
-                    "count": float(count_unverified)
+                    "count": try_2_float(count_unverified)
                 },
                 {
                     "name": "已验证",
                     "status": "verified",
-                    "count": float(count_verified)
+                    "count": try_2_float(count_verified)
                 },
                 {
                     "name": "关注预言",
                     "status": "favorite",
-                    "count": float(favorite)
+                    "count": try_2_float(favorite)
                 }
             ]
         }
@@ -324,7 +324,7 @@ class CompareInfoWithStatusResource(Resource):
             'create_user_id': data.PortfolioCompareInfo.create_user_id,
             'username': data.username,
             'favorite': data.favorite,
-            'complete_rate': None if data.complete_rate is None else float(data.complete_rate),
+            'complete_rate': try_2_float(data.complete_rate),
         } for data in pagination.items]
         ret_dic = {
             'page': pagination.page,
@@ -440,17 +440,17 @@ class PortfolioSummaryResource(Resource):
                 {
                     "name": "全部",
                     "status": "all",
-                    "count": float(count_all)
+                    "count": try_2_float(count_all)
                 },
                 {
                     "name": "我的",
                     "status": "my",
-                    "count": float(count_my)
+                    "count": try_2_float(count_my)
                 },
                 {
                     "name": "关注组合",
                     "status": "favorite",
-                    "count": float(favorite)
+                    "count": try_2_float(favorite)
                 }
             ]
         }
@@ -535,8 +535,8 @@ class PortfolioListResource(Resource):
                 'asset_name': asset_name,
                 'asset_type': data.asset_type,
                 'trade_date': date_cur,
-                'weight': float(data.weight),
-                'weight_before': float(data.weight_before),
+                'weight': try_2_float(data.weight),
+                'weight_before': try_2_float(data.weight_before),
                 'price_type': data.price_type,
                 'direction': data.direction,
             })
@@ -610,8 +610,8 @@ class PortfolioListResource(Resource):
                     'asset_name': asset_name,
                     'asset_type': data.asset_type,
                     'trade_date': date_cur,
-                    'weight': float(data.weight),
-                    'weight_before': float(data.weight_before),
+                    'weight': try_2_float(data.weight),
+                    'weight_before': try_2_float(data.weight_before),
                     'price_type': data.price_type,
                     'direction': data.direction,
                 })
@@ -691,7 +691,7 @@ class PortfolioAssetDistributionResource(Resource):
             # 扩展
             pl_list.append({
                 'name': data.asset_type,
-                'value': None if data.weight is None else float(data.weight),
+                'value': try_2_float(data.weight),
             })
             asset_name_list.append(data.asset_type)
 
@@ -781,8 +781,8 @@ class PortfolioListByStatusResource(Resource):
                 'username': data.username,
                 'favorite': data.favorite,
                 'trade_date': date_2_str(data.trade_date),
-                'rr': None if data.rr is None else float(data.rr),
-                'nav': None if data.nav is None else float(data.nav),
+                'rr': try_2_float(data.rr),
+                'nav': try_2_float(data.nav),
                 'access_type': data.PortfolioInfo.access_type,
             } for data in pagination.items]
             ret_dic = {

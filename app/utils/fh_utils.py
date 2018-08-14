@@ -4,9 +4,10 @@ Created on 2016-12-22
 @author: MG
 """
 import os
+import time
+import functools
 from datetime import datetime, date, timedelta
 import pytz
-# import matplotlib.pyplot as plt
 import numpy as np
 # from pandas.tslib import Timestamp
 from pandas import Timestamp
@@ -18,10 +19,39 @@ import warnings
 from functools import reduce
 import xlrd
 
+logger = logging.getLogger(__name__)
 STR_FORMAT_DATE = '%Y-%m-%d'
 STR_FORMAT_DATETIME = '%Y-%m-%d %H:%M:%S'
+STR_FORMAT_DATETIME2 = '%Y-%m-%d %H:%M:%S.%f'
 PATTERN_DATE_FORMAT_RESTRICT = re.compile(r"\d{4}(\D)*\d{2}(\D)*\d{2}")
 PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
+
+
+def try_2_float(data):
+    try:
+        return None if data is None else float(data)
+    except:
+        logger.exception('%s 转化失败', data)
+        return None
+
+
+def split_chunk(l: list, n: int):
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
+
+def zip_split(*args, sep=','):
+    """
+    将多个字符串，按照 sep 分割对齐，形成元祖数组
+    :param args: [str1, str2, ...]
+    :param sep: 默认 ,
+    :return:
+    """
+    return list(zip(*[arg.split(sep=sep) for arg in args]))
+
+
+def unzip_join(tuple_list, sep=','):
+    return (sep.join(arg) for arg in zip(*tuple_list))
 
 
 def populate_obj(model_obj, data_dic: dict, attr_list=None, error_if_no_key=False):
@@ -42,6 +72,45 @@ def populate_obj(model_obj, data_dic: dict, attr_list=None, error_if_no_key=Fals
             warnings.warn("data_dic 缺少 '%s' key 无法设置到 %s" % (name, model_obj.__class__.__name__))
 
 
+def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None):
+    """
+    尝试最多 times 次，异常捕获记录后继续尝试
+    :param times:
+    :param sleep_time:
+    :param logger: 如果异常需要 log 记录则传入参数
+    :return:
+    """
+    last_invoked_time = [None]
+
+    def wrap_func(func):
+
+        @functools.wraps(func)
+        def try_it(*arg, **kwargs):
+            for n in range(1, times+1):
+                if sleep_time > 0 and last_invoked_time[0] is not None\
+                        and (time.time() - last_invoked_time[0]) < sleep_time:
+                    time.sleep(sleep_time - (time.time() - last_invoked_time[0]))
+
+                try:
+                    ret_data = func(*arg, **kwargs)
+                except:
+                    if logger is not None:
+                        logger.exception("第 %d 次调用 %s(%s, %s) 出错", n, func.__name__, arg, kwargs)
+                    continue
+                finally:
+                    last_invoked_time[0] = time.time()
+
+                break
+            else:
+                ret_data = None
+
+            return ret_data
+
+        return try_it
+
+    return wrap_func
+
+
 def date_2_str(dt):
     if dt is not None and type(dt) in (date, datetime, Timestamp):
         dt_str = dt.strftime(STR_FORMAT_DATE)
@@ -50,9 +119,9 @@ def date_2_str(dt):
     return dt_str
 
 
-def datetime_2_str(dt):
+def datetime_2_str(dt, format=STR_FORMAT_DATETIME):
     if dt is not None and type(dt) in (date, datetime, Timestamp):
-        dt_str = dt.strftime(STR_FORMAT_DATETIME)
+        dt_str = dt.strftime(format)
     else:
         dt_str = dt
     return dt_str
@@ -491,7 +560,7 @@ def calc_performance(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq='we
     if day_per_data <= 0.008:
         freq_real = 'minute'
     elif day_per_data <= 0.2:
-            freq_real = 'hour'
+        freq_real = 'hour'
     elif day_per_data <= 2:
         freq_real = 'daily'
     elif day_per_data <= 10:
@@ -550,7 +619,6 @@ def calc_performance(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq='we
         date_list = list(data_df.index)
         date_latest = date_list[-1]
         nav_latest = data_df.Value.loc[date_latest]
-        rr_cur = rr_df[date_latest]
         # 计算 近7天，近30天，近365天收益率
         date_week_ago = date_latest - timedelta(days=7)
         date_month_ago = date_latest - timedelta(days=30)
@@ -615,20 +683,19 @@ def calc_performance(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq='we
         date_end = date_list[-1]
         stat_dic = OrderedDict([('date_begen', date_begin),
                                 ('date_end', date_end),
-                                ('rr_cur', rr_cur),  # 当日收益率
-                                ('rr_tot', rr_tot),  # 总收益率
-                                ('rr_week', rr_week),  # 近7天收益率
-                                ('rr_month', rr_month),  # 近30天收益率
-                                ('rr_year', rr_year),  # 近365天收益率
-                                ('final_value', final_value),  # 净值 nav
-                                ('min_value', min_value),  # 最低净值
-                                ('CAGR', CAGR),  # 年化收益率
-                                ('ann_vol', ann_vol),  # 年化波动率
-                                ('down_side_vol', down_side_vol),  # 下行波动率
-                                ('mdd', mdd_size),  # 最大回撤
-                                ('sharpe_ratio', sharpe_ratio),  # 夏普比率
-                                ('sortino_ratio', sortino_ratio),  # 索提诺比率
-                                ('calmar_ratio', calmar_ratio),  # 卡玛比率
+                                ('rr_tot', rr_tot),
+                                ('rr_week', rr_week),
+                                ('rr_month', rr_month),
+                                ('rr_year', rr_year),
+                                ('final_value', final_value),
+                                ('min_value', min_value),
+                                ('CAGR', CAGR),
+                                ('ann_vol', ann_vol),
+                                ('down_side_vol', down_side_vol),
+                                ('mdd', mdd_size),
+                                ('sharpe_ratio', sharpe_ratio),
+                                ('sortino_ratio', sortino_ratio),
+                                ('calmar_ratio', calmar_ratio),
                                 ('profit_loss_ratio', profit_loss_ratio),  # 盈亏比
                                 ('win_ratio', '%.2f' % win_ratio),  # 胜率
                                 ('mdd_max_period', mdd_max_period),  # 最长不创新高周期数
@@ -637,8 +704,6 @@ def calc_performance(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq='we
                                 ('min_ret', min_ret),  # 统计周期最大亏损
                                 ('max_rr_month', max_rr_month),  # 最大月收益
                                 ('min_rr_month', min_rr_month),  # 最大月亏损
-                                ('times_yeb', times_yeb),  # 相当于余额宝收益倍数
-
                                 ])
         stat_dic_dic[col_name if suffix_name is None else col_name + "_" + suffix_name] = stat_dic
 
@@ -656,7 +721,7 @@ def return_risk_analysis(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq
     :return:
     """
     nav_sorted_df = nav_df.copy()
-    nav_sorted_df.index = [try_2_date(idx) for idx in nav_sorted_df.index]
+    nav_sorted_df.index = pd.to_datetime([try_2_date(idx) for idx in nav_sorted_df.index])
     nav_sorted_df.sort_index(inplace=True)
     # 计算数据实际频率是日频、周频、月頻
     data_count = nav_sorted_df.shape[0]
@@ -698,6 +763,7 @@ def return_risk_analysis(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq
     else:
         raise ValueError('freq=%s 只接受 daily weekly monthly 三种之一', freq)
     stat_dic_dic = OrderedDict()
+    mon_rr_dic = {}
     if type(date_frm) is str:
         date_frm = datetime.strptime(date_frm, '%Y-%m-%d').date()
     if type(date_to) is str:
@@ -785,13 +851,20 @@ def return_risk_analysis(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq
                                 ('最大月亏损', '%.2f%%' % (min_rr_month * 100))])
         stat_dic_dic[col_name if suffix_name is None else col_name + "_" + suffix_name] = stat_dic
 
+        # 按时间周期进行相关统计
+        data_df = data_df.set_index('Date')[['Value']]
+        # data_df_g = data_df.groupby(pd.Grouper(freq='M'))
+        # TODO: 首月收益未被计算进去，以后再修复
+        monthly_rr_df = data_df.resample('M', convention='end').last().pct_change().fillna(0)
+        mon_rr_dic[col_name if suffix_name is None else col_name + "_" + suffix_name] = monthly_rr_df
+
     if len(stat_dic_dic) > 0:
         stat_df = pd.DataFrame(stat_dic_dic)
-        stat_df = stat_df.ix[list(stat_dic.keys())]
+        stat_df = stat_df.loc[list(stat_dic.keys())]
     else:
         stat_df = None
 
-    return stat_df
+    return stat_df, mon_rr_dic
 
 
 class DataFrame(pd.DataFrame):
@@ -825,11 +898,13 @@ class DataFrame(pd.DataFrame):
 
 def reduce_list(funx, data_list, initial=None):
     result_list = []
+
     def reduce_func(x, y):
         # print(x,y)
         result = funx(x, y)
         result_list.append(result)
         return result
+
     if initial is None:
         reduce(reduce_func, data_list)
     else:
@@ -866,11 +941,12 @@ def drawback_analysis(data_df, keep_max=False):
     if data_df is None or data_df.shape[0] <= 1:
         mdd_df = None
     else:
-        mdd_df = data_df.apply(lambda xx: [rr[1] for rr in reduce_list(_calc_mdd_4_drawback_analysis, xx, (xx.iloc[0], 0, keep_max))])
+        mdd_df = data_df.apply(
+            lambda xx: [rr[1] for rr in reduce_list(_calc_mdd_4_drawback_analysis, xx, (xx.iloc[0], 0, keep_max))])
     return mdd_df
 
 
-def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None):
+def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None, encoding=None):
     """
     读xls文件，对每个sheet进行分析，并最终合并绩效分析报告
     回撤分析分别生成文件显示
@@ -883,13 +959,14 @@ def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None):
     else:
         is_csv_file = False
     if is_csv_file:
-        sheet_names = ['']
+        sheet_names = ['sheet1']
     else:
         workbook = xlrd.open_workbook(file_path)
         sheet_names = workbook.sheet_names()
 
-    sheet_df_dic = {}
+    sheet_mdd_df_dic = {}
     stat_df = None
+    sheet_mon_rr_dic = {}
     for sheet_name in sheet_names:
         # if sheet_name not in col_names:
         #     continue
@@ -913,7 +990,7 @@ def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None):
             # 默认第0列为日期
             # sheetname Deprecated since version 0.21.0: Use sheet_name instead
             if is_csv_file:
-                data_df = pd.read_csv(file_path, index_col=index_col)  # 某些版本使用 sheet_name
+                data_df = pd.read_csv(file_path, index_col=index_col, encoding=encoding)  # 某些版本使用 sheet_name
             else:
                 data_df = pd.read_excel(file_path, index_col=index_col, sheet_name=sheet_name)  # 某些版本使用 sheet_name
 
@@ -926,18 +1003,19 @@ def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None):
                 suffix_name = sheet_name
             else:
                 suffix_name = None
-            stat_df_tmp = return_risk_analysis(data_df, freq=None, suffix_name=suffix_name)  # , freq='daily'
+            stat_df_tmp, mon_rr_dic = return_risk_analysis(data_df, freq=None, suffix_name=suffix_name)  # , freq='daily'
             if stat_df is None:
                 stat_df = stat_df_tmp
             else:
                 stat_df = stat_df.merge(stat_df_tmp, how='outer', left_index=True, right_index=True)
 
             mdd_df = drawback_analysis(data_df)
-            sheet_df_dic[sheet_name] = mdd_df
+            sheet_mdd_df_dic[sheet_name] = mdd_df
+            sheet_mon_rr_dic[sheet_name] = mon_rr_dic
         except:
             logging.exception('处理 %s 时失败', sheet_name)
             continue
-    return stat_df, sheet_df_dic
+    return stat_df, sheet_mdd_df_dic, sheet_mon_rr_dic
 
 
 def merge_nav(df_list, date_from=None):
@@ -968,8 +1046,8 @@ def merge_nav(df_list, date_from=None):
     if date_from is not None:
         pct_mean_s = pct_mean_s[pct_mean_s.index >= str_2_date(date_from)]
     nav_merged_df = pd.DataFrame({"nav": pct_mean_s.cumprod()})
-    stat_df = return_risk_analysis(nav_merged_df, freq=None)
-    stat_funds_df = return_risk_analysis(nav_df, freq=None)
+    stat_df, _ = return_risk_analysis(nav_merged_df, freq=None)
+    stat_funds_df, _ = return_risk_analysis(nav_df, freq=None)
     stat_all_df = stat_df.merge(stat_funds_df, how='outer', right_index=True, left_index=True)
     return nav_merged_df, nav_df, stat_all_df
 
@@ -1033,14 +1111,33 @@ def merge_nav_from_file(file_list, date_from=None):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(levelname)s [%(name)s] %(message)s')
+    from pandas.io.formats.excel import ExcelCell
     # 基金绩效分析
-    file_path = r'd:\Works\F复华投资\L路演、访谈、评估报告\万霁\SS5931_万霁九号私募投资基金_产品净值 20180523.xlsx'
+    file_path = r'd:\WSPych\fof_ams\Stage\periodic_task\analysis_cache\2016-6-1_2018-6-1\各策略指数走势_按机构.csv'
     file_path_no_extention, _ = os.path.splitext(file_path)
-    stat_df, sheet_df_dic = return_risk_analysis_by_xls(file_path)  # , date_col="日期", nav_col_list=['产品净值']
+    stat_df, sheet_mdd_df_dic, sheet_mon_rr_dic = return_risk_analysis_by_xls(file_path, encoding='GBK')  # , date_col="日期", nav_col_list=['产品净值']
     if stat_df is not None:
         stat_df.to_csv('%s_绩效统计.csv' % file_path_no_extention, encoding='GBK')
-    for sheet_name, mdd_df in sheet_df_dic.items():
+    for sheet_name, mdd_df in sheet_mdd_df_dic.items():
         mdd_df.to_csv('%s_%s_最大回撤.csv' % (file_path_no_extention, sheet_name), encoding='GBK')
+    if len(sheet_mon_rr_dic) > 0:
+        xls_file_path = '%s_%s_月度收益.xls' % (file_path_no_extention, sheet_name)
+        writer = pd.ExcelWriter(xls_file_path)
+        try:
+            for sheet_name, mon_rr_dic in sheet_mon_rr_dic.items():
+                start_row = 1
+                for name, monthly_rr_df in mon_rr_dic.items():
+                    year_set = {trade_date.year for trade_date in monthly_rr_df.index}
+                    monthly_rr_matrix_df = pd.DataFrame(index=year_set, columns=range(1, 13))
+                    for trade_date, rr_s in monthly_rr_df.T.items():
+                        monthly_rr_matrix_df.loc[trade_date.year, trade_date.month] = '%2.2f%%' % (rr_s[0] * 100)
+                    # 写 excel
+                    # sheet.write(start_row, 0, name)
+                    writer.write_cells([ExcelCell(0, 0, name)], sheet_name, startrow=start_row - 1)
+                    monthly_rr_matrix_df.to_excel(writer, sheet_name, startrow=start_row)
+                    start_row += len(year_set) + 3
+        finally:
+            writer.close()
 
     # 基金净值合并
     # file_list = [
@@ -1092,3 +1189,14 @@ if __name__ == "__main__":
     #     stat_df.to_excel(writer, sheet_name="绩效统计")
     #     writer.save()
     # logging.info("输出文件：\n%s", file_path)
+
+    # 测试 chuck 函数
+    a_list = list(range(1, 17))
+    for b_list in split_chunk(a_list, 4):
+        print(b_list)
+    for b_list in split_chunk(a_list, 5):
+        print(b_list)
+    for b_list in split_chunk(a_list, 16):
+        print(b_list)
+    for b_list in split_chunk(a_list, 17):
+        print(b_list)
