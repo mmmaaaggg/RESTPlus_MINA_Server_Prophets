@@ -171,9 +171,9 @@ def get_asset_name(asset_type, asset_code):
 
 
 @api.route('/candle/<string:asset_type>/<string:asset_code>/<string:item_order>')
-@api.param('asset_type', '资产类型')
+@api.param('asset_type', '资产类型：portfolio、future、stock、index、fund')
 @api.param('asset_code', '资产代码')
-@api.param('item_order', '返回列顺序 默认DOHLCVA，分别对应 date, open, high, low, close, vol, amt')
+@api.param('item_order', '返回列顺序 默认DOHLCVA，分别对应 date, open, high, low, close, vol, amt（仅对 future、stock、index 有用）')
 @api.response(404, "item_order 参数错误", model=error_model)
 class AssetCandle(Resource):
 
